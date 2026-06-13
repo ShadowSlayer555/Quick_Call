@@ -44,7 +44,7 @@ export default function App() {
     mqttClient.on('message', (topic, payload) => {
         try {
           const msg = JSON.parse(payload.toString()) as MqttMessage;
-          handleMessage(msg, topic);
+          handleMessage(msg, mqttClient);
         } catch (e) {
           // ignore parsing error
         }
@@ -61,7 +61,7 @@ export default function App() {
     stateRef.current = { view, myName, acceptedGuests, pendingGuests };
   }, [view, myName, acceptedGuests, pendingGuests]);
 
-  const handleMessage = (msg: MqttMessage, topic: string) => {
+  const handleMessage = (msg: MqttMessage, currentClient: MqttClient) => {
     const s = stateRef.current;
     
     if (msg.type === 'CALL_ALL' && msg.callerId !== myId) {
@@ -74,7 +74,7 @@ export default function App() {
     if (s.view === 'host_room') {
       if (msg.type === 'DISCOVER') {
         const pong: MqttMessage = { type: 'HOST_PONG', hostId: myId, hostName: s.myName };
-        client?.publish(getHostsTopic(), JSON.stringify(pong));
+        currentClient.publish(getHostsTopic(), JSON.stringify(pong));
       } else if (msg.type === 'JOIN_REQUEST') {
         setPendingGuests(prev => {
           if (prev.find(p => p.id === msg.guestId) || s.acceptedGuests.find(p => p.id === msg.guestId)) return prev;
@@ -126,21 +126,26 @@ export default function App() {
     setPendingGuests([]);
     setAcceptedGuests([{ id: myId, name }]);
     setView('host_room');
-    client?.subscribe([getDiscoverTopic()]);
+    client?.subscribe(getDiscoverTopic());
   };
 
   const becomeHost = (name: string) => {
     setMyName(name);
     setView('host_room');
     setAcceptedGuests([{ id: myId, name }]);
-    client?.subscribe([getDiscoverTopic()]);
+    client?.subscribe(getDiscoverTopic());
   };
 
   const findHosts = (name: string) => {
     setMyName(name);
     setView('join_list');
-    client?.subscribe([getHostsTopic()]);
-    refreshHosts();
+    if (client) {
+      client.subscribe(getHostsTopic(), () => {
+        refreshHosts();
+      });
+    } else {
+      refreshHosts();
+    }
   };
 
   const refreshHosts = () => {
