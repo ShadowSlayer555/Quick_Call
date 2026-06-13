@@ -13,10 +13,10 @@ export class WebRTCManager {
   constructor(
     private myId: string,
     private mqttClient: mqtt.MqttClient,
-    private localMediaStream: MediaStream,
+    private localMediaStream?: MediaStream,
     private onSignalError?: (err: any) => void
   ) {
-    this.localStream = localMediaStream;
+    this.localStream = localMediaStream || null;
   }
 
   public initiateMesh(peersToConnect: {id:string, name:string}[]) {
@@ -96,10 +96,13 @@ export class WebRTCManager {
       ]
     });
 
-    if (this.localStream) {
+    if (this.localStream && this.localStream.getTracks().length > 0) {
       this.localStream.getTracks().forEach(track => {
         pc.addTrack(track, this.localStream!);
       });
+    } else {
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+      pc.addTransceiver('video', { direction: 'recvonly' });
     }
 
     pc.onicecandidate = (event) => {

@@ -258,10 +258,19 @@ export default function App() {
                  try {
                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
                    setLocalStream(stream);
+                   setView('home');
                  } catch (e) {
-                   console.error('Initial media permission denied:', e);
+                   console.warn('Initial video+audio permission denied:', e);
+                   try {
+                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                     setLocalStream(stream);
+                     setView('home');
+                   } catch (e2) {
+                     console.error('Initial audio only permission denied:', e2);
+                     alert('Camera/Microphone access was denied. Please check your browser site settings or open this app in a New Tab if you are in a preview iframe.');
+                     setView('home');
+                   }
                  }
-                 setView('home');
                }}
                className="px-10 py-5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all uppercase tracking-wider text-base"
              >

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff, Settings } from 'lucide-react';
 import { PeerInfo } from '../types';
 import { WebRTCManager } from '../lib/webrtc';
@@ -44,6 +44,9 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave, sharedLoc
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
 
+  // Filter out myId just in case it was included in the peers list
+  const otherPeers = peers.filter(p => p.id !== myId);
+
   useEffect(() => {
     navigator.mediaDevices.enumerateDevices().then(setDevices);
   }, []);
@@ -58,20 +61,37 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave, sharedLoc
         
         // If we don't have a stream, or user selected a specific device we need to get a new one
         if (!stream || (selectedVideo || selectedAudio)) {
-            const newStream = await navigator.mediaDevices.getUserMedia({
-              video: selectedVideo ? { deviceId: { exact: selectedVideo } } : true,
-              audio: selectedAudio ? { deviceId: { exact: selectedAudio } } : true
-            });
-            activeStream = newStream;
-            stream = newStream;
+            try {
+              const newStream = await navigator.mediaDevices.getUserMedia({
+                video: selectedVideo ? { deviceId: { exact: selectedVideo } } : true,
+                audio: selectedAudio ? { deviceId: { exact: selectedAudio } } : true
+              });
+              activeStream = newStream;
+              stream = newStream;
+            } catch (e) {
+              console.warn("Video failed, trying audio only", e);
+              try {
+                const newStream = await navigator.mediaDevices.getUserMedia({
+                  audio: selectedAudio ? { deviceId: { exact: selectedAudio } } : true,
+                  video: false
+                });
+                activeStream = newStream;
+                stream = newStream;
+              } catch(e2) {
+                console.error("Audio fallback failed", e2);
+                alert("Could not access camera or microphone. Check permissions or open in a new tab.");
+              }
+            }
         }
 
-        applyToggles(stream);
-        setLocalStream(stream);
+        if (stream) {
+          applyToggles(stream);
+          setLocalStream(stream);
+        }
 
         if (!mqttClient) return;
 
-        rtcManager = new WebRTCManager(myId, mqttClient, stream, (err) => console.error('RTC Error', err));
+        rtcManager = new WebRTCManager(myId, mqttClient, stream || undefined, (err) => console.error('RTC Error', err));
         managerRef.current = rtcManager;
         
         rtcManager.onStreamAdd = (peerId, remoteStream) => {
@@ -93,14 +113,16 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave, sharedLoc
         setManager(rtcManager);
         
         // Process buffered signals safely before initiating mesh
-        while (signalBuffer.length > 0) {
-            const msg = signalBuffer.shift();
-            if (msg && msg.type === 'WEBRTC_SIGNAL' && peers.find(p => p.id === msg.senderId)) {
+        const signalsToProcess = [...signalBuffer];
+        for (const msg of signalsToProcess) {
+            if (msg.type === 'WEBRTC_SIGNAL' && otherPeers.find(p => p.id === msg.senderId)) {
                 rtcManager.handleSignal(msg.senderId, msg.signal);
+                const idx = signalBuffer.indexOf(msg);
+                if (idx !== -1) signalBuffer.splice(idx, 1);
             }
         }
 
-        rtcManager.initiateMesh(peers);
+        rtcManager.initiateMesh(otherPeers);
       } catch (err) {
         console.error("Failed to init media", err);
       }
@@ -135,13 +157,13 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave, sharedLoc
       const idx = signalBuffer.indexOf(msg);
       if (idx !== -1) signalBuffer.splice(idx, 1);
 
-      if (msg.type === 'WEBRTC_SIGNAL' && managerRef.current && peers.find(p => p.id === msg.senderId)) {
+      if (msg.type === 'WEBRTC_SIGNAL' && managerRef.current && otherPeers.find(p => p.id === msg.senderId)) {
         managerRef.current.handleSignal(msg.senderId, msg.signal);
       }
     };
     window.addEventListener('webrtc_signal', handleSignal);
     return () => window.removeEventListener('webrtc_signal', handleSignal);
-  }, [peers]);
+  }, [otherPeers]);
 
   const applyToggles = (stream: MediaStream) => {
     stream.getAudioTracks().forEach(t => t.enabled = audioEnabled);
@@ -208,7 +230,7 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave, sharedLoc
           </div>
           
           {Array.from(remoteStreams.entries()).map(([peerId, stream]) => {
-            const name = peers.find(p => p.id === peerId)?.name || 'Unknown';
+            const name = otherPeers.find(p => p.id === peerId)?.name || 'Unknown';
             return <RemoteVideo key={peerId} stream={stream} name={name} />;
           })}
         </div>
@@ -298,7 +320,7 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave, sharedLoc
         {/* Participants Bento */}
         <div className="bg-[#111] border border-[#222] rounded-3xl p-5 flex flex-col flex-1 min-h-0 hidden md:flex">
           <div className="flex items-center justify-between mb-4 shrink-0">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500">In Call ({peers.length + 1})</h3>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500">In Call ({otherPeers.length + 1})</h3>
           </div>
           <div className="space-y-3 overflow-y-auto pr-1">
             <div className="p-3 bg-[#1a1a1a] rounded-xl border border-[#333] flex items-center gap-3">
@@ -308,7 +330,7 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave, sharedLoc
                 <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-widest">Local</p>
               </div>
             </div>
-            {peers.map(p => (
+            {otherPeers.map(p => (
               <div key={p.id} className="p-3 bg-[#1a1a1a] rounded-xl border border-[#333] flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-[#222] flex items-center justify-center font-bold text-sm border border-[#444]">
