@@ -1,8 +1,10 @@
+import 'webrtc-adapter';
 import { MqttMessage, getPrivateTopic } from './mqttStore';
 import mqtt from 'mqtt';
 
 export class WebRTCManager {
   private peers: Map<string, RTCPeerConnection> = new Map();
+  private pendingCandidates: Map<string, RTCIceCandidateInit[]> = new Map();
   public localStream: MediaStream | null = null;
   public remoteStreams: Map<string, MediaStream> = new Map();
   public onStreamAdd?: (peerId: string, stream: MediaStream) => void;
@@ -54,6 +56,7 @@ export class WebRTCManager {
     
     if (signal.type === 'offer') {
       pc.setRemoteDescription(new RTCSessionDescription(signal)).then(() => {
+        this.flushCandidates(senderId, pc);
         return pc.createAnswer();
       }).then(answer => {
         return pc.setLocalDescription(answer);
@@ -61,10 +64,24 @@ export class WebRTCManager {
         this.sendSignal(senderId, pc.localDescription);
       }).catch(this.onSignalError);
     } else if (signal.type === 'answer') {
-      pc.setRemoteDescription(new RTCSessionDescription(signal)).catch(this.onSignalError);
+      pc.setRemoteDescription(new RTCSessionDescription(signal)).then(() => {
+        this.flushCandidates(senderId, pc);
+      }).catch(this.onSignalError);
     } else if (signal.candidate) {
-      pc.addIceCandidate(new RTCIceCandidate(signal)).catch(this.onSignalError);
+      if (pc.remoteDescription && pc.remoteDescription.type) {
+        pc.addIceCandidate(new RTCIceCandidate(signal)).catch(this.onSignalError);
+      } else {
+        const queue = this.pendingCandidates.get(senderId) || [];
+        queue.push(signal);
+        this.pendingCandidates.set(senderId, queue);
+      }
     }
+  }
+
+  private flushCandidates(senderId: string, pc: RTCPeerConnection) {
+    const candidates = this.pendingCandidates.get(senderId) || [];
+    candidates.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c)).catch(this.onSignalError));
+    this.pendingCandidates.delete(senderId);
   }
 
   private getOrCreatePeer(peerId: string): RTCPeerConnection {

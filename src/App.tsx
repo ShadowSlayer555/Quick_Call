@@ -3,7 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import mqtt, { MqttClient } from 'mqtt';
 import { MqttMessage, getPrivateTopic, getCallAllTopic, getDiscoverTopic, getHostsTopic, MQTT_BROKER_URL } from './lib/mqttStore';
 import { AppView, PeerInfo } from './types';
-import { Phone, PhoneCall, Users } from 'lucide-react';
+import { Phone, PhoneCall, Users, Mic } from 'lucide-react';
+import { initAudio, startRingTone, stopRingTone } from './lib/audioEngine';
 
 import SetupScreen from './components/SetupScreen';
 import HostRoom from './components/HostRoom';
@@ -14,7 +15,7 @@ import CallScreen from './components/CallScreen';
 export default function App() {
   const [myId] = useState(() => uuidv4());
   const [myName, setMyName] = useState('');
-  const [view, setView] = useState<AppView>('home');
+  const [view, setView] = useState<AppView>('entry');
   const [client, setClient] = useState<MqttClient | null>(null);
   
   // Host state
@@ -60,6 +61,14 @@ export default function App() {
   useEffect(() => {
     stateRef.current = { view, myName, acceptedGuests, pendingGuests };
   }, [view, myName, acceptedGuests, pendingGuests]);
+
+  useEffect(() => {
+    if (view === 'ringing') {
+      startRingTone();
+    } else {
+      stopRingTone();
+    }
+  }, [view]);
 
   const handleMessage = (msg: MqttMessage, currentClient: MqttClient) => {
     const s = stateRef.current;
@@ -233,6 +242,29 @@ export default function App() {
       </header>
 
       <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        {view === 'entry' && (
+          <div className="flex-1 flex flex-col items-center justify-center">
+             <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mb-8 shadow-[0_0_40px_rgba(79,70,229,0.5)]">
+               <Mic className="w-10 h-10 text-white" />
+             </div>
+             <h2 className="text-3xl font-bold tracking-tight text-white mb-3">Welcome to Quick_Call</h2>
+             <p className="text-zinc-400 mb-10 max-w-sm text-center text-lg">To hear incoming calls and connect your microphone, please enable audio to continue.</p>
+             <button
+               onClick={() => {
+                 initAudio();
+                 setView('home');
+                 // Pre-request media permissions to avoid Safari issues
+                 navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+                   .then((stream) => stream.getTracks().forEach(t => t.stop()))
+                   .catch(e => console.warn('Pre-request media error:', e));
+               }}
+               className="px-10 py-5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all uppercase tracking-wider text-base"
+             >
+               Enable Audio & Enter
+             </button>
+          </div>
+        )}
+
         {view === 'home' && (
           <div className="flex-1 flex flex-col items-center justify-center">
             <div className="w-full max-w-sm space-y-4">
@@ -258,7 +290,7 @@ export default function App() {
           </div>
         )}
 
-        {view !== 'home' && view !== 'in_call' && (
+        {view !== 'entry' && view !== 'home' && view !== 'in_call' && (
           <div className="flex-1 bg-[#111] border border-[#222] rounded-3xl p-6 shadow-2xl relative w-full h-full flex flex-col max-w-5xl mx-auto overflow-hidden">
              {view === 'host_setup' && <SetupScreen title="Host a Call" actionObj={{ label: 'Start Hosting', action: becomeHost }} onSecondary={() => setView('home')} />}
              {view === 'join_setup' && <SetupScreen title="Join a Call" actionObj={{ label: 'Find Hosts', action: findHosts }} onSecondary={() => setView('home')} />}
