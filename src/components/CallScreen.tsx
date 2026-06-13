@@ -17,9 +17,9 @@ const RemoteVideo = ({ stream, name }: { stream: MediaStream, name: string }) =>
     if (ref.current) ref.current.srcObject = stream;
   }, [stream]);
   return (
-    <div className="relative rounded-xl overflow-hidden bg-gray-950 aspect-video border border-gray-800">
+    <div className="relative rounded-2xl overflow-hidden bg-[#181818] aspect-video border border-[#333]">
       <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />
-      <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-md text-sm font-medium">
+      <div className="absolute bottom-3 left-3 bg-[#1a1a1a]/80 backdrop-blur rounded-lg px-3 py-1 text-xs font-bold uppercase tracking-wider border border-white/10 flex flex-col">
         {name}
       </div>
     </div>
@@ -163,105 +163,140 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave }: CallScr
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto content-start">
-        {/* Local Video */}
-        <div className="relative rounded-xl overflow-hidden bg-gray-950 aspect-video border border-gray-800">
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className={`w-full h-full object-cover ${!screenSharing ? 'scale-x-[-1]' : ''}`}
-          />
-          <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-md text-sm font-medium text-white shadow-sm flex items-center gap-2">
-            You {screenSharing && '(Sharing Screen)'}
+    <div className="flex-1 grid grid-cols-1 md:grid-cols-12 md:grid-rows-6 gap-4 min-h-0 min-w-0">
+      
+      {/* Primary Video Center (Bento Main Box) */}
+      <div className="md:col-span-8 md:row-span-6 bg-[#111] border border-[#222] rounded-3xl relative overflow-hidden group flex flex-col min-h-0">
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 overflow-y-auto content-start">
+          <div className="relative rounded-2xl overflow-hidden bg-[#181818] aspect-video border border-[#333]">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover ${!screenSharing ? 'scale-x-[-1]' : ''}`}
+            />
+            <div className="absolute bottom-3 left-3 bg-[#1a1a1a]/80 backdrop-blur rounded-lg px-3 py-1 text-xs font-bold uppercase tracking-wider border border-white/10 flex items-center gap-2">
+              You {screenSharing && '(Sharing Screen)'}
+            </div>
           </div>
-        </div>
-        
-        {/* Remote Videos */}
-        {Array.from(remoteStreams.entries()).map(([peerId, stream]) => {
-          const name = peers.find(p => p.id === peerId)?.name || 'Unknown';
-          return <RemoteVideo key={peerId} stream={stream} name={name} />;
-        })}
-      </div>
-
-      <div className="h-20 bg-gray-900 border border-gray-800 rounded-xl px-4 flex items-center justify-between">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="p-3 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setAudioEnabled(!audioEnabled)}
-            className={`p-4 rounded-full transition-colors ${audioEnabled ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
-          >
-            {audioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-          </button>
           
-          <button
-            onClick={() => setVideoEnabled(!videoEnabled)}
-            className={`p-4 rounded-full transition-colors ${videoEnabled ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
-          >
-            {videoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-          </button>
-
-          <button
-            onClick={toggleScreenShare}
-            className={`p-4 rounded-full transition-colors ${screenSharing ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-gray-800 hover:bg-gray-700 text-white'}`}
-          >
-            <MonitorUp className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={onLeave}
-            className="ml-4 p-4 rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors shadow-lg shadow-red-500/20"
-          >
-            <PhoneOff className="w-5 h-5 relative -left-0.5" />
-          </button>
+          {Array.from(remoteStreams.entries()).map(([peerId, stream]) => {
+            const name = peers.find(p => p.id === peerId)?.name || 'Unknown';
+            return <RemoteVideo key={peerId} stream={stream} name={name} />;
+          })}
         </div>
-        
-        <div className="w-10"></div> {/* spacer for centering flex */}
-      </div>
 
-      {showSettings && (
-        <div className="absolute bottom-28 left-8 bg-gray-900 border border-gray-800 p-4 rounded-xl shadow-2xl w-72 space-y-4">
-          <h3 className="font-semibold text-white border-b border-gray-800 pb-2">Device Settings</h3>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-gray-400 font-medium uppercase tracking-wider">Camera</label>
-              <select
-                className="mt-1 w-full bg-gray-950 border border-gray-800 rounded-md p-2 text-sm text-white focus:outline-none focus:border-red-500"
-                value={selectedVideo}
-                onChange={e => setSelectedVideo(e.target.value)}
-              >
-                <option value="">Default</option>
-                {devices.filter(d => d.kind === 'videoinput').map(d => (
-                  <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.slice(0,5)}`}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 font-medium uppercase tracking-wider">Microphone</label>
-              <select
-                className="mt-1 w-full bg-gray-950 border border-gray-800 rounded-md p-2 text-sm text-white focus:outline-none focus:border-red-500"
-                value={selectedAudio}
-                onChange={e => setSelectedAudio(e.target.value)}
-              >
-                 <option value="">Default</option>
-                {devices.filter(d => d.kind === 'audioinput').map(d => (
-                  <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0,5)}`}</option>
-                ))}
-              </select>
-            </div>
+        {/* Action Bar inside Main Video Box (Bento style) */}
+        <div className="absolute bottom-4 left-4 right-4 z-20 flex justify-between items-end pointer-events-none">
+          <div className="flex items-center gap-3">
+             {/* Left side spacer, could add status here */}
+          </div>
+          <div className="flex gap-2 pointer-events-auto items-center">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="p-3 bg-[#1a1a1a]/80 backdrop-blur rounded-xl border border-white/10 hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-white hidden md:block"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => setAudioEnabled(!audioEnabled)}
+              className={`p-3 backdrop-blur rounded-xl border transition-colors ${audioEnabled ? 'bg-[#1a1a1a]/80 border-white/10 hover:bg-zinc-800 text-white' : 'bg-red-500/20 border-red-500/50 text-red-500 hover:bg-red-500/30'}`}
+            >
+              {audioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+            </button>
+            
+            <button
+              onClick={() => setVideoEnabled(!videoEnabled)}
+              className={`p-3 backdrop-blur rounded-xl border transition-colors ${videoEnabled ? 'bg-[#1a1a1a]/80 border-white/10 hover:bg-zinc-800 text-white' : 'bg-red-500/20 border-red-500/50 text-red-500 hover:bg-red-500/30'}`}
+            >
+              {videoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+            </button>
+
+            <button
+              onClick={toggleScreenShare}
+              className={`p-3 backdrop-blur rounded-xl border transition-colors hidden sm:block ${screenSharing ? 'bg-indigo-600 border-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.4)] text-white' : 'bg-[#1a1a1a]/80 border-white/10 hover:bg-zinc-800 text-white'}`}
+            >
+              <MonitorUp className="w-5 h-5" />
+            </button>
+
+            <button
+               onClick={onLeave}
+               className="p-3 bg-red-600 hover:bg-red-500 border border-red-500/50 rounded-xl transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)] text-white ml-2 flex items-center justify-center"
+            >
+              <PhoneOff className="w-5 h-5" />
+            </button>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Side Content Bento Boxes */}
+      <div className="md:col-span-4 md:row-span-6 flex flex-col gap-4 min-h-0">
+        
+        {/* Device Settings Bento */}
+        {showSettings && (
+          <div className="bg-[#111] border border-[#222] rounded-3xl p-5 flex flex-col shrink-0 fade-in hidden md:flex">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-4">Device Configuration</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] text-zinc-400 uppercase font-bold block mb-2">Camera Input</label>
+                <select
+                  className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  value={selectedVideo}
+                  onChange={e => setSelectedVideo(e.target.value)}
+                >
+                  <option value="">Default Camera</option>
+                  {devices.filter(d => d.kind === 'videoinput').map(d => (
+                    <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.slice(0,5)}`}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-zinc-400 uppercase font-bold block mb-2">Microphone</label>
+                <select
+                  className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  value={selectedAudio}
+                  onChange={e => setSelectedAudio(e.target.value)}
+                >
+                   <option value="">Default Microphone</option>
+                  {devices.filter(d => d.kind === 'audioinput').map(d => (
+                    <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0,5)}`}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Participants Bento */}
+        <div className="bg-[#111] border border-[#222] rounded-3xl p-5 flex flex-col flex-1 min-h-0 hidden md:flex">
+          <div className="flex items-center justify-between mb-4 shrink-0">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500">In Call ({peers.length + 1})</h3>
+          </div>
+          <div className="space-y-3 overflow-y-auto pr-1">
+            <div className="p-3 bg-[#1a1a1a] rounded-xl border border-[#333] flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-sm shadow-lg">YOU</div>
+              <div>
+                <p className="text-sm font-medium">You</p>
+                <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-widest">Local</p>
+              </div>
+            </div>
+            {peers.map(p => (
+              <div key={p.id} className="p-3 bg-[#1a1a1a] rounded-xl border border-[#333] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[#222] flex items-center justify-center font-bold text-sm border border-[#444]">
+                     {p.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-medium">{p.name}</span>
+                </div>
+                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }

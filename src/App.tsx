@@ -205,41 +205,47 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-sans selection:bg-red-500/30">
-      <header className="absolute top-0 w-full p-4 md:p-6 flex justify-between items-center z-10 pointer-events-none">
-         <div className="font-bold text-xl tracking-tight pointer-events-auto">
-           Quick<span className="text-red-500">Call</span>
-         </div>
-         {view === 'home' && (
-           <button
-             onClick={() => setView('call_all_setup')}
-             className="pointer-events-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg shadow-lg shadow-red-500/20 transition-colors flex items-center gap-2 text-sm"
-           >
-             <PhoneCall className="w-4 h-4" />
-             Call All
-           </button>
-         )}
+    <div className="w-full h-screen bg-[#050505] text-[#e0e0e0] font-sans flex flex-col p-4 md:p-6 overflow-hidden selection:bg-indigo-500/30">
+      <header className="flex items-center justify-between mb-4 md:mb-6 bg-[#111] border border-[#222] rounded-2xl px-6 py-4 shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-xl shadow-[0_0_15px_rgba(79,70,229,0.4)]">QC</div>
+          <div className="hidden sm:block">
+            <h1 className="text-lg font-bold tracking-tight uppercase">Quick_Call</h1>
+            <p className="text-[10px] text-zinc-500 font-mono tracking-widest uppercase">shadowslayer555.github.io</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+           {view === 'home' && (
+             <button
+               onClick={() => setView('call_all_setup')}
+               className="px-6 py-2 rounded-xl bg-red-600 hover:bg-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all text-sm font-bold uppercase tracking-wider flex items-center gap-2"
+             >
+               <PhoneCall className="w-4 h-4 hidden sm:block" />
+               Call All
+             </button>
+           )}
+        </div>
       </header>
 
-      <main className="max-w-5xl mx-auto p-4 md:p-8 h-screen pt-24 pb-8 flex flex-col">
+      <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {view === 'home' && (
-          <div className="flex-1 flex flex-col items-center justify-center -mt-16">
+          <div className="flex-1 flex flex-col items-center justify-center">
             <div className="w-full max-w-sm space-y-4">
               <button
                 onClick={() => setView('host_setup')}
-                className="w-full py-5 bg-gray-900 border border-gray-800 rounded-2xl hover:bg-gray-800 hover:border-blue-500/50 transition-all font-medium text-lg flex flex-col items-center justify-center gap-3 group"
+                className="w-full py-5 bg-[#111] border border-[#222] rounded-3xl hover:border-indigo-500/50 transition-all font-medium text-lg flex flex-col items-center justify-center gap-3 group"
               >
-                <div className="p-4 rounded-full bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
-                  <Users className="w-6 h-6 text-blue-400" />
+                <div className="p-4 rounded-full bg-[#1a1a1a] border border-[#333] group-hover:bg-indigo-500/20 transition-colors">
+                  <Users className="w-6 h-6 text-indigo-400 group-hover:text-indigo-300" />
                 </div>
                 Host a Room
               </button>
               <button
                 onClick={() => setView('join_setup')}
-                className="w-full py-5 bg-gray-900 border border-gray-800 rounded-2xl hover:bg-gray-800 hover:border-green-500/50 transition-all font-medium text-lg flex flex-col items-center justify-center gap-3 group"
+                className="w-full py-5 bg-[#111] border border-[#222] rounded-3xl hover:border-indigo-500/50 transition-all font-medium text-lg flex flex-col items-center justify-center gap-3 group"
               >
-                 <div className="p-4 rounded-full bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
-                  <Phone className="w-6 h-6 text-green-400" />
+                 <div className="p-4 rounded-full bg-[#1a1a1a] border border-[#333] group-hover:bg-indigo-500/20 transition-colors">
+                  <Phone className="w-6 h-6 text-indigo-400 group-hover:text-indigo-300" />
                 </div>
                 Join a Room
               </button>
@@ -248,7 +254,7 @@ export default function App() {
         )}
 
         {view !== 'home' && view !== 'in_call' && (
-          <div className="flex-1 border border-gray-800/60 rounded-2xl bg-gray-900/40 p-6 md:p-10 shadow-2xl overflow-hidden backdrop-blur-sm relative">
+          <div className="flex-1 bg-[#111] border border-[#222] rounded-3xl p-6 shadow-2xl relative w-full h-full flex flex-col max-w-5xl mx-auto overflow-hidden">
              {view === 'host_setup' && <SetupScreen title="Host a Call" actionObj={{ label: 'Start Hosting', action: becomeHost }} onSecondary={() => setView('home')} />}
              {view === 'join_setup' && <SetupScreen title="Join a Call" actionObj={{ label: 'Find Hosts', action: findHosts }} onSecondary={() => setView('home')} />}
              {view === 'call_all_setup' && <SetupScreen title="Call Everyone" actionObj={{ label: 'Send Call Request', action: startCallAll }} onSecondary={() => setView('home')} />}

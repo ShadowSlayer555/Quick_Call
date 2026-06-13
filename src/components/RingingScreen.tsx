@@ -9,27 +9,29 @@ interface RingingScreenProps {
 
 export default function RingingScreen({ caller, onAccept, onDecline }: RingingScreenProps) {
   return (
-    <div className="flex flex-col items-center justify-center h-full max-w-sm mx-auto space-y-12">
-      <div className="text-center space-y-4 relative">
-        <div className="absolute inset-0 bg-red-500/20 blur-3xl rounded-full scale-150 animate-pulse" />
-        <div className="relative">
-          <h2 className="text-xl text-gray-400">Incoming Call From</h2>
-          <h1 className="text-4xl font-bold mt-2 text-white">{caller?.name || 'Unknown'}</h1>
+    <div className="flex flex-col items-center justify-center h-full max-w-sm mx-auto space-y-10">
+      <div className="text-center space-y-2 relative">
+        <div className="absolute inset-0 bg-indigo-500/20 blur-3xl rounded-full scale-150 animate-pulse" />
+        <div className="relative z-10">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">Incoming Call From</h2>
+          <h1 className="text-3xl font-bold text-[#e0e0e0]">{caller?.name || 'Unknown'}</h1>
         </div>
       </div>
 
-      <div className="flex gap-6 relative">
+      <div className="flex gap-6 relative z-10 w-full px-8">
         <button
           onClick={onDecline}
-          className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-transform hover:scale-110 shadow-lg shadow-red-500/20"
+          className="flex-1 py-4 bg-[#1a1a1a] border border-red-500/30 hover:border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.1)] hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] rounded-2xl flex flex-col items-center justify-center transition-all text-red-500 gap-2"
         >
-          <PhoneOff className="w-6 h-6 text-white" />
+          <PhoneOff className="w-6 h-6" />
+          <span className="text-[10px] font-bold uppercase tracking-widest">Decline</span>
         </button>
         <button
           onClick={onAccept}
-          className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-transform hover:scale-110 animate-bounce shadow-lg shadow-green-500/20"
+          className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.3)] rounded-2xl flex flex-col items-center justify-center transition-all animate-bounce text-white gap-2"
         >
-          <Phone className="w-6 h-6 text-white" />
+          <Phone className="w-6 h-6" />
+          <span className="text-[10px] font-bold uppercase tracking-widest">Accept</span>
         </button>
       </div>
     </div>
