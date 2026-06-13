@@ -6,6 +6,9 @@ export const getHostsTopic = () => `${TOPIC_PREFIX}/hosts`;
 export const getCallAllTopic = () => `${TOPIC_PREFIX}/call_all`;
 export const getPrivateTopic = (userId: string) => `${TOPIC_PREFIX}/pvt/${userId}`;
 
+export const signalBuffer: MqttMessage[] = [];
+export const clearSignalBuffer = () => { signalBuffer.length = 0; };
+
 export type MqttMessage =
   | { type: 'DISCOVER' }
   | { type: 'HOST_PONG'; hostId: string; hostName: string }

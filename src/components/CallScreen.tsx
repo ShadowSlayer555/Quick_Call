@@ -3,15 +3,17 @@ import { Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff, Settings } from 'luc
 import { PeerInfo } from '../types';
 import { WebRTCManager } from '../lib/webrtc';
 import mqtt from 'mqtt';
+import { signalBuffer } from '../lib/mqttStore';
 
 interface CallScreenProps {
   myId: string;
   peers: PeerInfo[];
   mqttClient: mqtt.MqttClient | null;
   onLeave: () => void;
+  sharedLocalStream?: MediaStream | null;
 }
 
-const RemoteVideo = ({ stream, name }: { stream: MediaStream, name: string }) => {
+const RemoteVideo: React.FC<{ stream: MediaStream, name: string }> = ({ stream, name }) => {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream;
@@ -26,10 +28,11 @@ const RemoteVideo = ({ stream, name }: { stream: MediaStream, name: string }) =>
   );
 };
 
-export default function CallScreen({ myId, peers, mqttClient, onLeave }: CallScreenProps) {
+export default function CallScreen({ myId, peers, mqttClient, onLeave, sharedLocalStream }: CallScreenProps) {
   const [manager, setManager] = useState<WebRTCManager | null>(null);
+  const managerRef = useRef<WebRTCManager | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(sharedLocalStream || null);
 
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
@@ -51,18 +54,25 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave }: CallScr
 
     const init = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: selectedVideo ? { deviceId: { exact: selectedVideo } } : true,
-          audio: selectedAudio ? { deviceId: { exact: selectedAudio } } : true
-        });
-        activeStream = stream;
+        let stream = localStream;
         
+        // If we don't have a stream, or user selected a specific device we need to get a new one
+        if (!stream || (selectedVideo || selectedAudio)) {
+            const newStream = await navigator.mediaDevices.getUserMedia({
+              video: selectedVideo ? { deviceId: { exact: selectedVideo } } : true,
+              audio: selectedAudio ? { deviceId: { exact: selectedAudio } } : true
+            });
+            activeStream = newStream;
+            stream = newStream;
+        }
+
         applyToggles(stream);
         setLocalStream(stream);
 
         if (!mqttClient) return;
 
         rtcManager = new WebRTCManager(myId, mqttClient, stream, (err) => console.error('RTC Error', err));
+        managerRef.current = rtcManager;
         
         rtcManager.onStreamAdd = (peerId, remoteStream) => {
           setRemoteStreams(prev => {
@@ -81,6 +91,15 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave }: CallScr
         };
 
         setManager(rtcManager);
+        
+        // Process buffered signals safely before initiating mesh
+        while (signalBuffer.length > 0) {
+            const msg = signalBuffer.shift();
+            if (msg && msg.type === 'WEBRTC_SIGNAL' && peers.find(p => p.id === msg.senderId)) {
+                rtcManager.handleSignal(msg.senderId, msg.signal);
+            }
+        }
+
         rtcManager.initiateMesh(peers);
       } catch (err) {
         console.error("Failed to init media", err);
@@ -90,12 +109,15 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave }: CallScr
     init();
 
     return () => {
-      if (activeStream) {
+      // Only stop tracks if we created a NEW activeStream, do NOT stop tracks of sharedLocalStream 
+      // unless we want to tear down the camera when leaving the call. Actually we can stop activeStream.
+      if (activeStream && activeStream !== sharedLocalStream) {
         activeStream.getTracks().forEach(t => t.stop());
       }
       if (rtcManager) {
         rtcManager.cleanup();
       }
+      managerRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myId, peers, mqttClient, selectedVideo, selectedAudio]);
@@ -106,6 +128,21 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave }: CallScr
     }
   }, [localStream]);
 
+  // Use managerRef to process signals immediately
+  useEffect(() => {
+    const handleSignal = (e: any) => {
+      const msg = e.detail;
+      const idx = signalBuffer.indexOf(msg);
+      if (idx !== -1) signalBuffer.splice(idx, 1);
+
+      if (msg.type === 'WEBRTC_SIGNAL' && managerRef.current && peers.find(p => p.id === msg.senderId)) {
+        managerRef.current.handleSignal(msg.senderId, msg.signal);
+      }
+    };
+    window.addEventListener('webrtc_signal', handleSignal);
+    return () => window.removeEventListener('webrtc_signal', handleSignal);
+  }, [peers]);
+
   const applyToggles = (stream: MediaStream) => {
     stream.getAudioTracks().forEach(t => t.enabled = audioEnabled);
     stream.getVideoTracks().forEach(t => t.enabled = videoEnabled);
@@ -115,17 +152,6 @@ export default function CallScreen({ myId, peers, mqttClient, onLeave }: CallScr
     if (localStream) applyToggles(localStream);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioEnabled, videoEnabled]);
-
-  useEffect(() => {
-    const handleSignal = (e: any) => {
-      const msg = e.detail;
-      if (manager && peers.find(p => p.id === msg.senderId)) {
-        manager.handleSignal(msg.senderId, msg.signal);
-      }
-    };
-    window.addEventListener('webrtc_signal', handleSignal);
-    return () => window.removeEventListener('webrtc_signal', handleSignal);
-  }, [manager, peers]);
 
   const toggleScreenShare = async () => {
     if (!manager) return;

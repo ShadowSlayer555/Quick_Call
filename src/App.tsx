@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import mqtt, { MqttClient } from 'mqtt';
-import { MqttMessage, getPrivateTopic, getCallAllTopic, getDiscoverTopic, getHostsTopic, MQTT_BROKER_URL } from './lib/mqttStore';
+import { MqttMessage, getPrivateTopic, getCallAllTopic, getDiscoverTopic, getHostsTopic, MQTT_BROKER_URL, signalBuffer, clearSignalBuffer } from './lib/mqttStore';
 import { AppView, PeerInfo } from './types';
 import { Phone, PhoneCall, Users, Mic } from 'lucide-react';
 import { initAudio, startRingTone, stopRingTone } from './lib/audioEngine';
@@ -17,6 +17,7 @@ export default function App() {
   const [myName, setMyName] = useState('');
   const [view, setView] = useState<AppView>('entry');
   const [client, setClient] = useState<MqttClient | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
   // Host state
   const [pendingGuests, setPendingGuests] = useState<PeerInfo[]>([]);
@@ -121,6 +122,7 @@ export default function App() {
     }
 
     if (msg.type === 'WEBRTC_SIGNAL') {
+      signalBuffer.push(msg);
       const event = new CustomEvent('webrtc_signal', { detail: msg });
       window.dispatchEvent(event);
     }
@@ -208,6 +210,7 @@ export default function App() {
   };
 
   const handleLeaveCall = () => {
+      clearSignalBuffer();
       setView('home');
       setPendingGuests([]);
       setAcceptedGuests([]);
@@ -250,13 +253,15 @@ export default function App() {
              <h2 className="text-3xl font-bold tracking-tight text-white mb-3">Welcome to Quick_Call</h2>
              <p className="text-zinc-400 mb-10 max-w-sm text-center text-lg">To hear incoming calls and connect your microphone, please enable audio to continue.</p>
              <button
-               onClick={() => {
+               onClick={async () => {
                  initAudio();
+                 try {
+                   const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                   setLocalStream(stream);
+                 } catch (e) {
+                   console.error('Initial media permission denied:', e);
+                 }
                  setView('home');
-                 // Pre-request media permissions to avoid Safari issues
-                 navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-                   .then((stream) => stream.getTracks().forEach(t => t.stop()))
-                   .catch(e => console.warn('Pre-request media error:', e));
                }}
                className="px-10 py-5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all uppercase tracking-wider text-base"
              >
@@ -350,6 +355,7 @@ export default function App() {
              peers={callPeers} 
              mqttClient={client} 
              onLeave={handleLeaveCall} 
+             sharedLocalStream={localStream}
            />
         )}
       </main>
